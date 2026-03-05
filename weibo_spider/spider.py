@@ -19,6 +19,7 @@ from tqdm import tqdm
 from . import config_util, datetime_util
 from .downloader import AvatarPictureDownloader
 from .parser import AlbumParser, IndexParser, PageParser, PhotoParser
+from .parser.comment_parser import CommentParser
 from .parser.util import handle_html_async
 from .user import User
 
@@ -134,6 +135,11 @@ class Spider:
             await downloader.download_files(weibos, self.session)
         for writer in self.writers:
             writer.write_weibo(weibos)
+
+    def write_comments(self, comments):
+        for writer in self.writers:
+            if hasattr(writer, 'write_comments'):
+                writer.write_comments(comments)
 
     def write_user(self, user):
         """将用户信息写入数据库"""
@@ -345,6 +351,17 @@ class Spider:
 
             async for weibos in self.get_weibo_info():
                 await self.write_weibo(weibos)
+                all_comments = []
+                for w in weibos:
+                    try:
+                        cp = CommentParser(self.cookie, w.id)
+                        cs = cp.get_comments(w.id, max_pages=3)
+                        if cs:
+                            all_comments.extend(cs)
+                    except Exception as e:
+                        logger.exception(e)
+                if all_comments:
+                    self.write_comments(all_comments)
                 self.got_num += len(weibos)
             if not self.filter:
                 logger.info(u'共爬取' + str(self.got_num) + u'条微博')

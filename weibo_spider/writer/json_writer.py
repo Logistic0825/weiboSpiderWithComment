@@ -50,3 +50,22 @@ class JsonWriter(Writer):
         with codecs.open(self.file_path, 'w', encoding='utf-8') as f:
             f.write(json.dumps(data, indent=4, ensure_ascii=False))
         logger.info(u'%d条微博写入json文件完毕，保存路径：%s', len(weibos), self.file_path)
+
+    def write_comments(self, comments):
+        data = {}
+        if os.path.isfile(self.file_path):
+            with codecs.open(self.file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+        if 'comments' not in data:
+            data['comments'] = {}
+        for c in comments:
+            c_dict = c.to_dict()
+            wid = c_dict.get('weibo_id')
+            if not wid:
+                continue
+            if wid not in data['comments']:
+                data['comments'][wid] = []
+            data['comments'][wid].append(c_dict)
+        with codecs.open(self.file_path, 'w', encoding='utf-8') as f:
+            f.write(json.dumps(data, indent=4, ensure_ascii=False))
+        logger.info(u'%d条评论写入json文件完毕，保存路径：%s', len(comments), self.file_path)

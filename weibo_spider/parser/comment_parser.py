@@ -8,6 +8,7 @@ from lxml.html import fromstring
 from lxml import etree
 from .parser import Parser
 from .util import handle_garbled, handle_html
+from ..comment import Comment
 
 logger = logging.getLogger('spider.comment_parser')
 
@@ -62,3 +63,72 @@ class CommentParser(Parser):
             logger.exception(u'网络出错')
 
         return video_url
+
+    def _get_page_num(self, selector):
+        try:
+            inputs = selector.xpath("//input[@name='mp']")
+            if inputs:
+                return int(inputs[0].attrib.get('value', '1'))
+            return 1
+        except Exception:
+            return 1
+
+    def _parse_comment_div(self, div, weibo_id):
+        try:
+            comment = Comment()
+            comment.weibo_id = weibo_id
+            cid = div.xpath("@id")
+            if cid:
+                comment.comment_id = cid[0]
+            user_link = div.xpath("a[1]")
+            if user_link:
+                href = user_link[0].xpath("@href")[0]
+                name = user_link[0].xpath("text()")[0] if user_link[0].xpath("text()") else ''
+                comment.username = handle_garbled(name) if name else ''
+                m = re.search(r'/(\d{4,})', href)
+                if m:
+                    comment.user_id = m.group(1)
+            ctt = div.xpath("span[@class='ctt']")
+            if ctt:
+                html_string = etree.tostring(ctt[0], encoding='unicode', method='html').replace('<br>', '\n')
+                new_content = fromstring(html_string).text_content()
+                new_content = re.sub(r'\n+\s*', '\n', new_content)
+                comment.content = handle_garbled(new_content)
+            ct_span = div.xpath("span[@class='ct']")
+            if ct_span:
+                ct_text = handle_garbled(ct_span[0])
+                publish_time = ct_text.split(u'来自')[0]
+                publish_time = publish_time[:16]
+                comment.publish_time = publish_time
+            a_texts = div.xpath(".//a/text()")
+            for t in reversed(a_texts):
+                m = re.search(r'赞\[(\d+)\]', t)
+                if m:
+                    comment.up_num = int(m.group(1))
+                    break
+            return comment
+        except Exception:
+            return None
+
+    def get_comments(self, weibo_id, max_pages=3):
+        comments = []
+        try:
+            selector = handle_html(self.cookie, self.url)
+            if selector is None:
+                return comments
+            total_pages = self._get_page_num(selector)
+            pages = min(total_pages, max_pages)
+            for page in range(1, pages + 1):
+                url = self.url + "?page=%d" % page
+                selector = handle_html(self.cookie, url)
+                if selector is None:
+                    continue
+                divs = selector.xpath("//div[@class='c' and starts-with(@id,'C')]")
+                for d in divs:
+                    c = self._parse_comment_div(d, weibo_id)
+                    if c and c.content:
+                        comments.append(c)
+                sleep(random.randint(2, 5))
+        except Exception:
+            logger.exception(u'网络出错')
+        return comments
