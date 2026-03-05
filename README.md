@@ -1,3 +1,5 @@
+参考项目：https://github.com/dataabc/weiboSpider
+
 [![Build Status](https://github.com/dataabc/weiboSpider/workflows/Python%20application/badge.svg)](https://badge.fury.io/py/weibo-spider)
 [![Python](https://img.shields.io/pypi/pyversions/weibo-spider)](https://badge.fury.io/py/weibo-spider)
 [![PyPI](https://badge.fury.io/py/weibo-spider.svg)](https://badge.fury.io/py/weibo-spider)
